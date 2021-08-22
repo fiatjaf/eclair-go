@@ -114,20 +114,27 @@ func (c *Client) Call(method string, data map[string]interface{}) (gjson.Result,
 
 func (c *Client) Websocket() (<-chan gjson.Result, error) {
 	url := strings.Replace(c.baseURL(), "http", "ws", 1) + "/ws"
-	conn, _, err := websocket.DefaultDialer.Dial(url, http.Header{
-		"Authorization": {c.authorizationHeader()},
-	})
-	if err != nil {
-		return nil, fmt.Errorf("failed to open websocket connection: %w", err)
-	}
 
 	messages := make(chan gjson.Result)
 	go func() {
 		defer close(messages)
+	retry:
+		conn, _, err := websocket.DefaultDialer.Dial(url, http.Header{
+			"Authorization": {c.authorizationHeader()},
+		})
+		if err != nil {
+			log.Println("failed to open websocket connection: " + err.Error())
+		}
 		for {
 			_, message, err := conn.ReadMessage()
 			if err != nil {
-				log.Println("eclair ws read error:", err)
+				if strings.Contains(err.Error(), "connection reset by peer") {
+					log.Println("lost websocket to eclair, reconnecing in 5 seconds")
+					time.Sleep(time.Second * 5)
+					goto retry
+				}
+
+				log.Println("eclair ws read error: ", err.Error())
 				return
 			}
 			messages <- gjson.ParseBytes(message)
