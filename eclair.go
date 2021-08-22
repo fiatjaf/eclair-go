@@ -24,6 +24,8 @@ type ErrorResponse struct {
 	Error string `json:"error"`
 }
 
+type Params map[string]interface{}
+
 func (c *Client) Call(method string, data map[string]interface{}) (gjson.Result, error) {
 	body := &bytes.Buffer{}
 	writer := multipart.NewWriter(body)
