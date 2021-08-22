@@ -27,36 +27,40 @@ type ErrorResponse struct {
 type Params map[string]interface{}
 
 func (c *Client) Call(method string, data map[string]interface{}) (gjson.Result, error) {
-	body := &bytes.Buffer{}
-	writer := multipart.NewWriter(body)
-
-	for k, v := range data {
-		fw, err := writer.CreateFormField(k)
-		if err != nil {
-			return gjson.Result{},
-				fmt.Errorf("error creating form field %s: %w", k, err)
-		}
-		_, err = io.Copy(fw, strings.NewReader(fmt.Sprintf("%v", v)))
-		if err != nil {
-			return gjson.Result{},
-				fmt.Errorf("error adding field value %s=%v: %w", k, v, err)
-		}
-	}
-
-	if err := writer.Close(); err != nil {
-		return gjson.Result{}, fmt.Errorf("error closing form-data writer: %w", err)
-	}
-
-	r, err := http.NewRequest("POST", c.Host, bytes.NewReader(body.Bytes()))
+	r, err := http.NewRequest("POST", c.Host+"/"+method, nil)
 	if err != nil {
 		return gjson.Result{},
 			fmt.Errorf("error creating http request to %s: %w", c.Host, err)
 	}
 
-	r.Header.Set("Content-Type", writer.FormDataContentType())
 	r.Header.Set("Accept", "application/json")
 	r.Header.Set("Authorization",
-		base64.StdEncoding.EncodeToString([]byte(":"+c.Password)))
+		"Basic "+base64.StdEncoding.EncodeToString([]byte(":"+c.Password)))
+
+	if data != nil {
+		body := &bytes.Buffer{}
+		writer := multipart.NewWriter(body)
+
+		for k, v := range data {
+			fw, err := writer.CreateFormField(k)
+			if err != nil {
+				return gjson.Result{},
+					fmt.Errorf("error creating form field %s: %w", k, err)
+			}
+			_, err = io.Copy(fw, strings.NewReader(fmt.Sprintf("%v", v)))
+			if err != nil {
+				return gjson.Result{},
+					fmt.Errorf("error adding field value %s=%v: %w", k, v, err)
+			}
+		}
+
+		if err := writer.Close(); err != nil {
+			return gjson.Result{}, fmt.Errorf("error closing form-data writer: %w", err)
+		}
+
+		r.Header.Set("Content-Type", writer.FormDataContentType())
+		r.Body = ioutil.NopCloser(bytes.NewReader(body.Bytes()))
+	}
 
 	w, err := (&http.Client{Timeout: time.Second * 10}).Do(r)
 	if err != nil {
