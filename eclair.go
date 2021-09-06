@@ -74,7 +74,7 @@ func (c *Client) Call(method string, data map[string]interface{}) (gjson.Result,
 		r.Body = ioutil.NopCloser(bytes.NewReader(body.Bytes()))
 	}
 
-	w, err := (&http.Client{Timeout: time.Second * 10}).Do(r)
+	w, err := http.DefaultClient.Do(r)
 	if err != nil {
 		return gjson.Result{}, fmt.Errorf("call to %s errored: %w", c.Host, err)
 	}
