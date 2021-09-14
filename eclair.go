@@ -78,6 +78,7 @@ func (c *Client) Call(method string, data map[string]interface{}) (gjson.Result,
 	if err != nil {
 		return gjson.Result{}, fmt.Errorf("call to %s errored: %w", c.Host, err)
 	}
+	defer w.Body.Close()
 
 	b, err := ioutil.ReadAll(w.Body)
 	if err != nil {
