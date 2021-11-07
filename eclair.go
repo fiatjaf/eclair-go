@@ -118,9 +118,22 @@ func (c *Client) Websocket() (<-chan gjson.Result, error) {
 
 	messages := make(chan gjson.Result)
 	go func() {
+		ticker := time.NewTicker(time.Second * 29)
+		defer ticker.Stop()
 		defer close(messages)
+
+		var err error
+		var conn *websocket.Conn
+
+		go func() {
+			for {
+				<-ticker.C
+				conn.WriteMessage(websocket.PingMessage, nil)
+			}
+		}()
+
 	retry:
-		conn, _, err := websocket.DefaultDialer.Dial(url, http.Header{
+		conn, _, err = websocket.DefaultDialer.Dial(url, http.Header{
 			"Authorization": {c.authorizationHeader()},
 		})
 		if err != nil {
@@ -130,7 +143,7 @@ func (c *Client) Websocket() (<-chan gjson.Result, error) {
 			_, message, err := conn.ReadMessage()
 			if err != nil {
 				if strings.Contains(err.Error(), "connection reset by peer") {
-					log.Println("lost websocket to eclair, reconnecing in 5 seconds")
+					log.Println("lost websocket to eclair, reconnecting in 5 seconds")
 					time.Sleep(time.Second * 5)
 					goto retry
 				}
